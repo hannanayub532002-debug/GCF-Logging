@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>GCF Machinery Log — FFC</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<!-- Google Identity Services (OAuth2 only — no gapi needed) -->
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --or:#F97316;--or2:#EA580C;--or3:#FED7AA;--or4:#FFF7ED;--or5:#FFEDD5;
+  --dk:#1C0A00;--md:#7C3400;--border:1px solid #FDBA74;
+  --grn:#16A34A;--red:#DC2626;--blu:#2563EB;
+}
+body{font-family:'Barlow',sans-serif;background:#FFF7ED;color:#1C0A00;font-size:13px}
+
+/* ── LOCK SCREEN ─────────────────────────────────────── */
+#lock-screen{
+  position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(140deg,#7C2D12 0%,#C2410C 45%,#F97316 100%);
+  display:flex;align-items:center;justify-content:center;
+}
+#lock-screen::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(45deg,rgba(255,255,255,.02) 0,rgba(255,255,255,.02) 1px,transparent 1px,transparent 20px);
+}
+.lock-card{
+  position:relative;background:white;border-radius:20px;
+  padding:36px 30px 28px;width:320px;text-align:center;
+  box-shadow:0 30px 80px rgba(0,0,0,.4);
+}
+.lock-logo{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:58px;height:58px;background:linear-gradient(135deg,#C2410C,#F97316);
+  border-radius:14px;font-family:'Barlow Condensed',sans-serif;font-size:22px;
+  font-weight:700;color:white;margin-bottom:14px;
+  box-shadow:0 8px 20px rgba(234,88,12,.4);
+}
+.lock-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:#1C0A00}
+.lock-sub{font-size:11px;color:#92400E;font-weight:600;margin:4px 0 20px}
+#pw-input{
+  width:100%;border:2px solid #FDBA74;border-radius:10px;padding:12px;
+  font-size:22px;font-family:'Barlow Condensed',sans-serif;color:#1C0A00;
+  background:#FFF7ED;text-align:center;letter-spacing:8px;margin-bottom:10px;
+}
+#pw-input:focus{outline:none;border-color:#EA580C;background:#FFEDD5}
+#pw-input.shake{animation:shake .4s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+.lock-btn{
+  width:100%;background:linear-gradient(135deg,#C2410C,#EA580C);color:white;
+  border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;
+  font-family:'Barlow',sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(234,88,12,.35);
+  transition:all .2s;
+}
+.lock-btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(234,88,12,.45)}
+#pw-error{color:#DC2626;font-size:10px;font-weight:700;margin-top:8px;min-height:14px}
+.lock-footer{margin-top:16px;font-size:9px;color:#D97706;font-weight:600;opacity:.7}
+
+/* ── TOAST ───────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:18px;left:12px;right:12px;z-index:8000;
+  background:#16A34A;color:white;border-radius:12px;
+  padding:11px 16px;font-size:12px;font-weight:700;text-align:center;
+  transform:translateY(80px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  box-shadow:0 8px 24px rgba(0,0,0,.2);
+}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.err{background:#DC2626}
+#toast.warn{background:#D97706}
+#toast.info{background:#2563EB}
+
+/* ── HEADER ──────────────────────────────────────────── */
+.header{background:linear-gradient(130deg,#C2410C 0%,#EA580C 50%,#F97316 100%);position:relative;overflow:hidden}
+.header::before{content:'';position:absolute;top:-60px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.06)}
+.hinner{position:relative;z-index:1;padding:10px 12px 8px;display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.logobox{background:white;border-radius:8px;padding:5px 10px;font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:#EA580C;flex-shrink:0}
+.ltext h1{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:white}
+.ltext p{font-size:10px;color:rgba(255,255,255,.8);font-weight:500}
+.hright{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.shift-meta{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:5px 10px}
+.shift-meta .sd{font-size:10px;color:rgba(255,255,255,.85);font-weight:600}
+.shift-sel{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);border-radius:6px;color:white;font-family:'Barlow',sans-serif;font-size:12px;font-weight:700;padding:2px 6px;width:100%}
+.shift-sel option{color:#1C0A00;background:white}
+.hbtns{display:flex;gap:4px}
+.hbtn{border:none;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;font-family:'Barlow',sans-serif;cursor:pointer;display:flex;align-items:center;gap:3px;transition:all .15s;white-space:nowrap}
+.hbtn-save{background:white;color:#EA580C;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.hbtn-save:hover{background:#FFF7ED;transform:translateY(-1px)}
+.hbtn-pdf{background:rgba(255,255,255,.2);color:white;border:1px solid rgba(255,255,255,.4)}
+.hbtn-pdf:hover{background:rgba(255,255,255,.3)}
+.hbtn-lock{background:rgba(0,0,0,.2);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.15)}
+.hbtn-lock:hover{background:rgba(0,0,0,.35)}
+.drive-badge{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:white;cursor:pointer}
+.drive-badge.connected{background:rgba(22,163,74,.3);border-color:rgba(22,163,74,.5);color:#86EFAC}
+.drive-badge.disconnected{background:rgba(220,38,38,.25);border-color:rgba(220,38,38,.4);color:#FCA5A5}
+.teambar{background:#C2410C;padding:5px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.15)}
+.tlabel{font-size:10px;font-weight:700;color:rgba(255,255,255,.65);letter-spacing:1px;text-transform:uppercase;flex-shrink:0}
+.tmember{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);border-radius:16px;padding:2px 10px;font-size:11px;font-weight:600;color:white;outline:none;cursor:text}
+.tmember:focus{background:rgba(255,255,255,.3)}
+
+/* ── TABS ────────────────────────────────────────────── */
+.tabbr{display:flex;gap:2px;background:#FDBA74;padding:4px;overflow-x:auto;scrollbar-width:none}
+.tabbr::-webkit-scrollbar{display:none}
+.tb{flex:1;min-width:max-content;padding:5px 8px;text-align:center;font-size:10px;font-weight:700;border-radius:7px;cursor:pointer;color:#92400E;border:none;background:transparent;font-family:'Barlow',sans-serif;transition:all .15s;white-space:nowrap}
+.tb.on{background:#EA580C;color:white}
+.tc{display:none}.tc.on{display:block}
+.main{padding:10px}
+
+/* ── SECTION TITLE ───────────────────────────────────── */
+.stitle{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:#EA580C;letter-spacing:1px;text-transform:uppercase;margin:10px 0 7px;display:flex;align-items:center;gap:8px}
+.stitle::after{content:'';flex:1;height:2px;background:linear-gradient(90deg,#FDBA74,transparent)}
+
+/* ── PRESSURE CARDS ──────────────────────────────────── */
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.pcard{background:white;border:var(--border);border-radius:10px;padding:10px 14px;position:relative;overflow:hidden}
+.pcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:#EA580C}
+.pcard .stage{font-size:10px;font-weight:700;color:#9A3412;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.prow{display:flex;justify-content:space-between}
+.pi .lbl{font-size:9px;color:#92400E;font-weight:700;letter-spacing:.4px;margin-bottom:1px}
+.pi input{width:68px;border:1px solid #FDBA74;border-radius:5px;padding:3px 6px;font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:#1C0A00;background:#FFF7ED;text-align:center}
+.pi input:focus{outline:none;border-color:#EA580C}
+.pi .unit{font-size:9px;color:#92400E;font-weight:600}
+
+/* ── STATS GRID ──────────────────────────────────────── */
+.sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.scard{background:white;border:var(--border);border-radius:9px;padding:8px 10px;text-align:center}
+.scard .sl{font-size:9px;font-weight:700;color:#92400E;letter-spacing:.4px;text-transform:uppercase;margin-bottom:3px}
+.scard .sv{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:#EA580C}
+.scard .su{font-size:9px;color:#92400E;font-weight:600}
+
+/* ── MACHINE TABLE ───────────────────────────────────── */
+.mtable{background:white;border:var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px}
+.mhead{background:#EA580C;display:grid;grid-template-columns:80px 32px 40px 1fr 90px 44px;padding:6px 8px;gap:3px}
+.mhead span{font-size:9px;font-weight:700;color:white;letter-spacing:.4px;text-transform:uppercase}
+.mrow{display:grid;grid-template-columns:80px 32px 40px 1fr 90px 44px;padding:5px 8px;align-items:center;border-bottom:1px solid #FED7AA;gap:3px;transition:background .15s}
+.mrow:last-child{border-bottom:none}
+.mrow.has-trips{background:#FFFBEB}
+.mrow.live{background:#FEF3C7}
+.grpdiv{background:#FFF7ED;padding:3px 8px;border-bottom:1px solid #FED7AA}
+.grpdiv span{font-size:9px;font-weight:700;color:#EA580C;letter-spacing:1px;text-transform:uppercase}
+.tag{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;color:#1C0A00}
+.cb{width:16px;height:16px;border-radius:3px;border:2px solid #FDBA74;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s}
+.cb.on{background:#EA580C;border-color:#EA580C}
+.cb.on::after{content:'✓';color:white;font-size:9px;font-weight:700;line-height:1}
+input.jinp{border:1px solid #FDBA74;border-radius:5px;padding:2px 4px;font-size:10px;font-family:'Barlow',sans-serif;color:#1C0A00;background:#FFF7ED;width:100%}
+input.jinp:focus{outline:none;border-color:#EA580C}
+.trip-summary{display:flex;flex-direction:column;gap:2px}
+.trip-count{font-size:9px;font-weight:700;color:#92400E}
+.trip-dur{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;color:#EA580C}
+.trip-dur.long{color:#DC2626}
+.trip-dur.none{color:#D1D5DB;font-weight:600;font-size:10px}
+.time-btn{
+  background:#FFF7ED;border:1px solid #FDBA74;border-radius:7px;
+  padding:5px 7px;font-size:14px;cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;
+}
+.time-btn:hover{background:#FFEDD5;border-color:#EA580C}
+.time-btn.active{background:#EA580C;color:white;border-color:#EA580C}
+
+/* ── TIME ENTRY MODAL ────────────────────────────────── */
+#time-modal-overlay{
+  position:fixed;inset:0;z-index:7000;
+  background:rgba(0,0,0,.55);
+  display:none;align-items:flex-end;justify-content:center;
+}
+#time-modal-overlay.open{display:flex}
+#time-modal{
+  background:white;border-radius:20px 20px 0 0;width:100%;max-width:480px;
+  max-height:92vh;overflow-y:auto;padding:0 0 24px;
+  animation:slideUp .25s cubic-bezier(.34,1.2,.64,1);
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.tm-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px 10px;border-bottom:2px solid #FED7AA;position:sticky;top:0;background:white;z-index:1;
+}
+.tm-machine{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:#EA580C}
+.tm-close{background:#FFF7ED;border:1px solid #FDBA74;border-radius:8px;padding:5px 10px;font-size:18px;cursor:pointer;line-height:1}
+.tm-close:hover{background:#FFEDD5}
+.tm-body{padding:12px 16px}
+.tm-tabs{display:flex;background:#FED7AA;border-radius:9px;padding:3px;margin-bottom:14px;gap:2px}
+.tm-tab{flex:1;padding:6px;text-align:center;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer;border:none;background:transparent;color:#92400E;font-family:'Barlow',sans-serif;transition:all .15s}
+.tm-tab.on{background:#EA580C;color:white}
+.tm-section{display:none}.tm-section.on{display:block}
+.tm-lbl{font-size:10px;font-weight:700;color:#92400E;letter-spacing:.4px;text-transform:uppercase;margin-bottom:4px;margin-top:10px;display:block}
+.tm-dt{
+  width:100%;border:2px solid #FDBA74;border-radius:9px;padding:9px 12px;
+  font-family:'Barlow',sans-serif;font-size:13px;color:#1C0A00;background:#FFF7ED;
+}
+.tm-dt:focus{outline:none;border-color:#EA580C;background:#FFEDD5}
+.tm-dur-box{
+  background:#FFF7ED;border:2px solid #FDBA74;border-radius:12px;padding:12px 14px;
+  text-align:center;margin-top:10px;
+}
+.tm-dur-label{font-size:10px;font-weight:700;color:#92400E;letter-spacing:.4px;text-transform:uppercase;margin-bottom:4px}
+.tm-dur-val{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;color:#EA580C}
+.tm-dur-val.neg{color:#DC2626}
+.tm-dur-sub{font-size:10px;color:#92400E;font-weight:600}
+.man-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.man-inp-wrap{position:relative}
+.man-inp{width:100%;border:2px solid #FDBA74;border-radius:9px;padding:9px 36px 9px 12px;font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:#1C0A00;background:#FFF7ED;text-align:center}
+.man-inp:focus{outline:none;border-color:#EA580C}
+.man-unit{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:#92400E}
+.type-row{display:flex;gap:6px;margin-top:12px}
+.type-opt{
+  flex:1;padding:8px 6px;text-align:center;border-radius:9px;cursor:pointer;
+  border:2px solid #FDBA74;font-size:11px;font-weight:700;font-family:'Barlow',sans-serif;
+  transition:all .15s;background:#FFF7ED;color:#92400E;
+}
+.type-opt.sel-none{border-color:#9CA3AF;background:#F9FAFB;color:#6B7280}
+.type-opt.sel-tripped{border-color:#F59E0B;background:#FEF3C7;color:#92400E}
+.type-opt.sel-manual{border-color:#6EE7B7;background:#ECFDF5;color:#065F46}
+.trips-log-section{margin-top:12px}
+.tl-title{font-size:10px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.tl-item{
+  background:#FFF7ED;border:1px solid #FDBA74;border-radius:8px;
+  padding:7px 10px;margin-bottom:5px;display:flex;align-items:center;gap:8px;
+}
+.tl-info{flex:1}
+.tl-time{font-size:10px;font-weight:700;color:#92400E}
+.tl-dur{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:#1C0A00}
+.tl-type{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;margin-top:2px;display:inline-block}
+.tl-type.tripped{background:#FEF3C7;color:#92400E}
+.tl-type.manual{background:#ECFDF5;color:#065F46}
+.tl-del{background:none;border:none;color:#FCA5A5;font-size:14px;cursor:pointer;padding:2px 5px;border-radius:5px}
+.tl-del:hover{background:#FEE2E2;color:#DC2626}
+.tm-footer{display:flex;gap:8px;margin-top:16px}
+.tm-btn{flex:1;padding:11px;border-radius:10px;font-size:12px;font-weight:700;font-family:'Barlow',sans-serif;cursor:pointer;border:none;transition:all .15s}
+.tm-btn-add{background:#FFF7ED;color:#EA580C;border:2px solid #EA580C}
+.tm-btn-add:hover{background:#FFEDD5}
+.tm-btn-save{background:#EA580C;color:white;box-shadow:0 4px 12px rgba(234,88,12,.3)}
+.tm-btn-save:hover{background:#C2410C}
+
+/* ── NOTES / AUDITS / CHECKLIST / SPARES ─────────────── */
+.note-area{background:white;border:var(--border);border-radius:10px;padding:10px 14px;margin-bottom:10px}
+.note-area textarea{width:100%;border:1px solid #FDBA74;border-radius:7px;padding:7px;font-size:11px;font-family:'Barlow',sans-serif;color:#1C0A00;resize:vertical;min-height:60px;background:#FFF7ED}
+.note-area textarea:focus{outline:none;border-color:#EA580C}
+.arow,.clrow{background:white;border:var(--border);border-radius:10px;padding:10px 14px;margin-bottom:10px}
+.aitems{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.aitem{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#7C3400;cursor:pointer}
+.clitems{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.clitem{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#7C3400;cursor:pointer}
+.spare-table{background:white;border:var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px}
+.spare-head{background:#EA580C;display:grid;grid-template-columns:1fr 70px 1fr 70px;padding:6px 10px;gap:4px}
+.spare-head span{font-size:9px;font-weight:700;color:white;letter-spacing:.4px;text-transform:uppercase}
+.spare-row{display:grid;grid-template-columns:1fr 70px 1fr 70px;padding:4px 8px;gap:4px;border-bottom:1px solid #FED7AA}
+.spare-row:last-child{border-bottom:none}
+.spare-row input{border:1px solid #FDBA74;border-radius:4px;padding:2px 5px;font-size:10px;width:100%;background:#FFF7ED;font-family:'Barlow',sans-serif;color:#1C0A00}
+.spare-row input:focus{outline:none;border-color:#EA580C}
+
+/* ── MTBF TABLE ──────────────────────────────────────── */
+.mtbf-table{background:white;border:var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px}
+.mth{background:#EA580C;display:grid;grid-template-columns:82px 1fr 1fr 1fr 1fr;padding:7px 8px;gap:4px}
+.mth span,.wth span{font-size:9px;font-weight:700;color:white;letter-spacing:.4px;text-transform:uppercase}
+.mtr,.wtr{display:grid;grid-template-columns:82px 1fr 1fr 1fr 1fr;padding:7px 8px;gap:4px;border-bottom:1px solid #FED7AA;align-items:center}
+.mtr:last-child,.wtr:last-child{border-bottom:none}
+.mtr:hover,.wtr:hover{background:#FFF7ED}
+.mv{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#1C0A00}
+.mv.red{color:#DC2626}.mv.grn{color:#16A34A}
+.bw{background:#FED7AA;border-radius:3px;height:5px;width:100%;overflow:hidden;margin-top:2px}
+.bf{height:100%;border-radius:3px;background:#EA580C;transition:width .4s}
+
+/* ── TRIP HISTORY ────────────────────────────────────── */
+.trips-list{padding-bottom:4px}
+.te{background:white;border:var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px}
+.te-tag{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:#EA580C;margin-bottom:3px}
+.te-badge{display:inline-block;border-radius:4px;padding:1px 7px;font-size:9px;font-weight:700;margin-bottom:4px}
+.te-badge.tripped{background:#FEF3C7;color:#92400E}
+.te-badge.manual{background:#ECFDF5;color:#065F46}
+.te-row{display:flex;justify-content:space-between;font-size:11px;color:#7C3400;font-weight:600;margin-top:2px}
+.te-dur{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#1C0A00;margin-top:3px}
+
+/* ── WEEKLY ──────────────────────────────────────────── */
+.week-ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:white;border:var(--border);border-radius:10px;padding:10px 14px;margin-bottom:10px}
+.week-ctrl label{font-size:10px;font-weight:700;color:#92400E;letter-spacing:.4px;text-transform:uppercase;flex-shrink:0}
+.week-ctrl select{flex:1;border:1px solid #FDBA74;border-radius:7px;padding:5px 10px;font-family:'Barlow',sans-serif;font-size:11px;color:#1C0A00;background:#FFF7ED}
+.week-ctrl select:focus{outline:none;border-color:#EA580C}
+.weekly-table{background:white;border:var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px}
+.wth{background:#EA580C;display:grid;grid-template-columns:82px 1fr 1fr 1fr 1fr;padding:7px 8px;gap:4px}
+.no-data{background:white;border:var(--border);border-radius:10px;text-align:center;padding:32px 20px;color:#92400E;font-size:12px;font-weight:600}
+
+/* ── SETTINGS ────────────────────────────────────────── */
+.sbox{background:white;border:var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.sbox-title{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:#EA580C;margin-bottom:10px;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.s-row{margin-bottom:10px}
+.s-row label{display:block;font-size:10px;font-weight:700;color:#92400E;letter-spacing:.4px;margin-bottom:4px;text-transform:uppercase}
+.s-row input{width:100%;border:1px solid #FDBA74;border-radius:8px;padding:8px 12px;font-family:'Barlow',sans-serif;font-size:12px;color:#1C0A00;background:#FFF7ED}
+.s-row input:focus{outline:none;border-color:#EA580C}
+.s-hint{font-size:10px;color:#92400E;line-height:1.7;margin-bottom:10px}
+.s-hint strong{color:#1C0A00}
+.s-hint a{color:#EA580C;font-weight:700}
+.s-btn{background:#EA580C;color:white;border:none;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:700;font-family:'Barlow',sans-serif;cursor:pointer;transition:background .15s}
+.s-btn:hover{background:#C2410C}
+.s-btn.sec{background:#FED7AA;color:#7C3400}.s-btn.sec:hover{background:#FDBA74}
+.s-btn.grn{background:#16A34A;color:white}.s-btn.grn:hover{background:#15803D}
+.s-btn.danger{background:#FEE2E2;color:#DC2626;border:1px solid #FECACA}
+.s-msg{font-size:10px;font-weight:700;margin-top:8px;min-height:14px}
+.s-msg.ok{color:#16A34A}.s-msg.err{color:#DC2626}
+.code-block{background:#1C0A00;color:#FED7AA;border-radius:8px;padding:12px;font-size:9px;font-family:'Courier New',monospace;overflow-x:auto;margin-top:8px;line-height:1.6;white-space:pre;max-height:200px;overflow-y:auto}
+.drive-status-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:10px;margin-bottom:10px}
+.ds-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ds-dot.ok{background:#16A34A}.ds-dot.warn{background:#F59E0B}.ds-dot.err{background:#DC2626}
+.ds-text{flex:1;font-size:11px;font-weight:600;color:#7C3400}
+.step-list{counter-reset:step;list-style:none;margin:0;padding:0}
+.step-list li{counter-increment:step;display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:10px;color:#7C3400;line-height:1.5}
+.step-list li::before{content:counter(step);flex-shrink:0;width:18px;height:18px;background:#EA580C;color:white;border-radius:50%;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+/* ── PRINT ───────────────────────────────────────────── */
+@media print{
+  #lock-screen,#toast,#time-modal-overlay,.tabbr,.hbtns,.drive-badge,.hbtn-lock,
+  #tab-mtbf,#tab-trips,#tab-weekly,#tab-settings{display:none!important}
+  .tc{display:none!important}
+  #tab-log{display:block!important}
+  body{background:white;font-size:11px}
+  .main{padding:4px}
+  .mtable,.note-area,.arow,.clrow,.spare-table{margin-bottom:6px}
+  @page{margin:8mm;size:A4}
+  .header,.mhead,.spare-head{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     LOCK SCREEN
+     ══════════════════════════════════════════════════════ -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-logo">FFC</div>
+    <div class="lock-icon-row" style="font-size:24px;margin-bottom:8px">🔐</div>
+    <div class="lock-title">GCF Machinery Log</div>
+    <div class="lock-sub">Secure · Cloud-Backed · v4</div>
+    <input type="password" id="pw-input" placeholder="••••••••" autocomplete="current-password"
+      onkeydown="if(event.key==='Enter')checkPassword()">
+    <button class="lock-btn" onclick="checkPassword()">Unlock System →</button>
+    <div id="pw-error"></div>
+    <div class="lock-footer">Default: FFC1234 &nbsp;·&nbsp; Change in Settings tab</div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- TIME ENTRY MODAL -->
+<div id="time-modal-overlay" onclick="if(event.target===this)closeTimeModal()">
+  <div id="time-modal">
+    <div class="tm-header">
+      <div>
+        <div class="tm-machine" id="tm-machine-name">Machine</div>
+        <div style="font-size:10px;font-weight:600;color:#92400E;margin-top:2px">Downtime Entry</div>
+      </div>
+      <button class="tm-close" onclick="closeTimeModal()">✕</button>
+    </div>
+    <div class="tm-body">
+      <div class="tm-tabs">
+        <button class="tm-tab on" onclick="switchTmTab('auto',this)">📅 Auto Calculate</button>
+        <button class="tm-tab" onclick="switchTmTab('manual',this)">⌚ Manual Duration</button>
+      </div>
+
+      <!-- AUTO CALCULATE -->
+      <div class="tm-section on" id="tm-auto">
+        <span class="tm-lbl">Start Date & Time</span>
+        <input type="datetime-local" class="tm-dt" id="tm-start" onchange="calcAutoDur()">
+        <span class="tm-lbl">End Date & Time</span>
+        <input type="datetime-local" class="tm-dt" id="tm-end" onchange="calcAutoDur()">
+        <div class="tm-dur-box">
+          <div class="tm-dur-label">Calculated Duration</div>
+          <div class="tm-dur-val" id="tm-auto-dur">—</div>
+          <div class="tm-dur-sub" id="tm-auto-min"></div>
+        </div>
+      </div>
+
+      <!-- MANUAL DURATION -->
+      <div class="tm-section" id="tm-manual">
+        <span class="tm-lbl">Enter Duration Directly</span>
+        <div class="man-grid">
+          <div class="man-inp-wrap">
+            <input type="number" class="man-inp" id="tm-man-h" min="0" max="9999" placeholder="0" oninput="calcManualDur()">
+            <span class="man-unit">HRS</span>
+          </div>
+          <div class="man-inp-wrap">
+            <input type="number" class="man-inp" id="tm-man-m" min="0" max="59" placeholder="0" oninput="calcManualDur()">
+            <span class="man-unit">MIN</span>
+          </div>
+        </div>
+        <div class="tm-dur-box" style="margin-top:10px">
+          <div class="tm-dur-label">Total Duration</div>
+          <div class="tm-dur-val" id="tm-man-dur">0 hrs 0 min</div>
+          <div class="tm-dur-sub" id="tm-man-min"></div>
+        </div>
+        <span class="tm-lbl" style="margin-top:10px">Start Date & Time (optional — for record)</span>
+        <input type="datetime-local" class="tm-dt" id="tm-man-start">
+      </div>
+
+      <!-- TRIP TYPE -->
+      <span class="tm-lbl">Trip Type</span>
+      <div class="type-row" id="tm-type-row">
+        <button class="type-opt sel-none" onclick="setTmType('none',this)">— None —</button>
+        <button class="type-opt" onclick="setTmType('tripped',this)">⚡ Tripped</button>
+        <button class="type-opt" onclick="setTmType('manual',this)">🔧 Manual Stop</button>
+      </div>
+
+      <!-- EXISTING TRIPS LOG -->
+      <div class="trips-log-section">
+        <div class="tl-title">
+          <span>Logged Trips for this Machine</span>
+          <span id="tm-trip-count" style="background:#FED7AA;border-radius:10px;padding:1px 7px;font-family:'Barlow Condensed',sans-serif;font-size:13px;color:#92400E">0</span>
+        </div>
+        <div id="tm-trips-log"></div>
+      </div>
+
+      <div class="tm-footer">
+        <button class="tm-btn tm-btn-add" onclick="addTrip()">+ Add This Trip</button>
+        <button class="tm-btn tm-btn-save" onclick="closeTimeModal()">✓ Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     MAIN APP
+     ══════════════════════════════════════════════════════ -->
+<div id="app" style="display:none">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="hinner">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="logobox">FFC</div>
+        <div class="ltext">
+          <h1>GCF Machinery</h1>
+          <p id="live-date">Loading…</p>
+        </div>
+      </div>
+      <div class="hright">
+        <div class="shift-meta">
+          <div class="sd">SHIFT</div>
+          <select class="shift-sel" id="shift-sel" onchange="onShiftChange()">
+            <option value="Day">☀️ Day Shift</option>
+            <option value="Night" selected>🌙 Night Shift</option>
+          </select>
+        </div>
+        <div class="drive-badge disconnected" id="drive-badge" onclick="switchTab('settings',document.querySelector('[data-tab=settings]'))">
+          <span id="drive-icon">☁️</span> <span id="drive-status-text">Not connected</span>
+        </div>
+        <div class="hbtns">
+          <button class="hbtn hbtn-save" onclick="saveShiftData()">💾 Save</button>
+          <button class="hbtn hbtn-pdf"  onclick="window.print()">🖨 PDF</button>
+          <button class="hbtn hbtn-lock" onclick="lockApp()">🔒</button>
+        </div>
+      </div>
+    </div>
+    <div class="teambar">
+      <span class="tlabel">Team</span>
+      <span class="tmember" id="tm1" contenteditable="true">Mazher Abbas</span>
+      <span class="tmember" id="tm2" contenteditable="true">Muhammad Javed</span>
+      <span class="tmember" id="tm3" contenteditable="true">Fahad</span>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabbr">
+    <button class="tb on" data-tab="log"     onclick="switchTab('log',this)">📋 Log Sheet</button>
+    <button class="tb"    data-tab="weekly"  onclick="switchTab('weekly',this)">📊 Weekly</button>
+    <button class="tb"    data-tab="mtbf"    onclick="switchTab('mtbf',this)">⚙️ MTBF</button>
+    <button class="tb"    data-tab="trips"   onclick="switchTab('trips',this)">⚡ Trips</button>
+    <button class="tb"    data-tab="settings" onclick="switchTab('settings',this)">⚙ Settings</button>
+  </div>
+
+  <div class="main">
+
+    <!-- ═══ LOG SHEET ═══════════════════════════════════ -->
+    <div id="tab-log" class="tc on">
+
+      <div class="stitle">Compressor Pressures</div>
+      <div class="pgrid">
+        <div class="pcard">
+          <div class="stage">1st Stage</div>
+          <div class="prow">
+            <div class="pi"><div class="lbl">Suction</div><input id="p1s" value="107"><div class="unit">psi</div></div>
+            <div class="pi" style="text-align:right"><div class="lbl">Discharge</div><input id="p1d" value="471"><div class="unit">psi</div></div>
+          </div>
+        </div>
+        <div class="pcard">
+          <div class="stage">2nd Stage</div>
+          <div class="prow">
+            <div class="pi"><div class="lbl">Suction</div><input id="p2s" value="452"><div class="unit">psi</div></div>
+            <div class="pi" style="text-align:right"><div class="lbl">Discharge</div><input id="p2d" value="840"><div class="unit">psi</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stitle">Live Stats</div>
+      <div class="sgrid">
+        <div class="scard"><div class="sl">Total Trips</div><div class="sv" id="st-trips">0</div></div>
+        <div class="scard"><div class="sl">Downtime</div><div class="sv" id="st-dt">0</div><div class="su">min</div></div>
+        <div class="scard"><div class="sl">Avg MTBF</div><div class="sv" id="st-mtbf">—</div><div class="su">hrs</div></div>
+      </div>
+
+      <div class="stitle">Maintenance Jobs</div>
+      <div class="mtable">
+        <div class="mhead">
+          <span>Machine</span><span>S/By</span><span>Avail</span>
+          <span>Job Carried Out</span><span>Downtime</span><span>⏱</span>
+        </div>
+        <div id="mbody"></div>
+      </div>
+
+      <div class="stitle">General Jobs & Reclamations</div>
+      <div class="note-area"><textarea id="gen-notes" placeholder="Enter general jobs, reclamations, observations…"></textarea></div>
+
+      <div class="stitle">Audits</div>
+      <div class="arow">
+        <div class="aitems">
+          <div class="aitem" onclick="toggleCb(this.querySelector('.cb'))"><div class="cb on"></div><span>Routine Checks of Machines</span></div>
+          <div class="aitem" onclick="toggleCb(this.querySelector('.cb'))"><div class="cb"></div><span>Weekly Greasing Audit</span></div>
+          <div class="aitem" onclick="toggleCb(this.querySelector('.cb'))"><div class="cb on"></div><span>Workshop Housekeeping</span></div>
+        </div>
+      </div>
+
+      <div class="stitle">Daily Checklist</div>
+      <div class="clrow">
+        <div class="clitems">
+          <div class="clitem" onclick="toggleCb(this.querySelector('.cb'))"><div class="cb"></div><span>EK-1501</span></div>
+          <div class="clitem" onclick="toggleCb(this.querySelector('.cb'))"><div class="cb on"></div><span>EK-1521</span></div>
+          <div class="clitem" onclick="toggleCb(this.querySelector('.cb'))"><div class="cb on"></div><span>EK-1531</span></div>
+        </div>
+      </div>
+
+      <div class="stitle">Spares Used</div>
+      <div class="spare-table">
+        <div class="spare-head"><span>Spare Used</span><span>Qty</span><span>Spare Used</span><span>Qty</span></div>
+        <div id="spare-body"></div>
+      </div>
+    </div>
+
+    <!-- ═══ WEEKLY ═══════════════════════════════════════ -->
+    <div id="tab-weekly" class="tc">
+      <div class="week-ctrl">
+        <label>Week:</label>
+        <select id="week-select" onchange="renderWeeklyAnalysis()"></select>
+        <button class="s-btn" style="padding:5px 12px;font-size:10px" onclick="loadWeeklyFromDrive()">↻ Refresh</button>
+        <button class="s-btn sec" style="padding:5px 12px;font-size:10px" onclick="exportWeeklyCSV()">⬇ CSV</button>
+      </div>
+      <div id="weekly-content"></div>
+    </div>
+
+    <!-- ═══ MTBF ══════════════════════════════════════════ -->
+    <div id="tab-mtbf" class="tc">
+      <div class="stitle">Current Shift — MTBF & Availability</div>
+      <div class="sgrid">
+        <div class="scard"><div class="sl">Total Trips</div><div class="sv" id="m-trips">0</div></div>
+        <div class="scard"><div class="sl">Total Downtime</div><div class="sv" id="m-dt">0</div><div class="su">min</div></div>
+        <div class="scard"><div class="sl">Fleet MTBF</div><div class="sv" id="m-mtbf">—</div><div class="su">hrs</div></div>
+      </div>
+      <div class="mtbf-table">
+        <div class="mth"><span>Machine</span><span>Trips</span><span>Downtime</span><span>MTBF</span><span>Avail</span></div>
+        <div id="mtbf-body"></div>
+      </div>
+    </div>
+
+    <!-- ═══ TRIPS ══════════════════════════════════════════ -->
+    <div id="tab-trips" class="tc">
+      <div class="stitle">Complete Trip Log — Current Shift</div>
+      <div class="trips-list" id="trips-list"></div>
+    </div>
+
+    <!-- ═══ SETTINGS ══════════════════════════════════════ -->
+    <div id="tab-settings" class="tc">
+
+      <!-- Google Drive -->
+      <div class="sbox">
+        <div class="sbox-title">☁️ Google Drive Storage</div>
+        <div id="drive-status-box" class="drive-status-row">
+          <div class="ds-dot warn" id="ds-dot"></div>
+          <div class="ds-text" id="ds-text">Not connected — enter your Client ID below</div>
+          <button class="s-btn grn" id="ds-btn" onclick="connectDrive()" style="padding:5px 12px;font-size:10px">Connect</button>
+        </div>
+
+        <div class="s-hint">
+          All shifts are saved as JSON files to your Google Drive folder.
+          You need a <strong>Google OAuth Client ID</strong> (free):
+        </div>
+        <ol class="step-list">
+          <li>Go to <a href="https://console.cloud.google.com/" target="_blank">console.cloud.google.com</a> → Create / select a project</li>
+          <li>APIs & Services → Enable APIs → enable <strong>Google Drive API</strong></li>
+          <li>OAuth consent screen → External → fill in app name → Save</li>
+          <li>Credentials → Create Credentials → <strong>OAuth 2.0 Client ID</strong> → Web Application</li>
+          <li>Authorised JS origins: add <strong>the URL where you open this file</strong> (e.g. <code>file://</code> or your server URL)</li>
+          <li>Copy the <strong>Client ID</strong> and paste below</li>
+        </ol>
+        <div class="s-row" style="margin-top:10px">
+          <label>Google OAuth Client ID</label>
+          <input type="text" id="client-id-input" placeholder="xxxx.apps.googleusercontent.com">
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="s-btn" onclick="saveClientId()">Save Client ID</button>
+          <button class="s-btn grn" onclick="connectDrive()">Connect to Drive</button>
+          <button class="s-btn sec" onclick="disconnectDrive()">Disconnect</button>
+        </div>
+        <div id="drive-msg" class="s-msg"></div>
+        <div style="margin-top:10px;font-size:10px;color:#92400E;font-weight:600">
+          📂 Drive Folder: <a href="https://drive.google.com/drive/folders/1-9AAHAYxdLUXg67HZxvrOVFmvNeE7s21" target="_blank" style="color:#EA580C">Open in Drive ↗</a>
+        </div>
+      </div>
+
+      <!-- Change Password -->
+      <div class="sbox">
+        <div class="sbox-title">🔒 Change Password</div>
+        <div class="s-row">
+          <label>Current Password</label>
+          <input type="password" id="cur-pw" placeholder="Enter current password">
+        </div>
+        <div class="s-row">
+          <label>New Password</label>
+          <input type="password" id="new-pw" placeholder="Min 4 characters">
+        </div>
+        <div class="s-row">
+          <label>Confirm New Password</label>
+          <input type="password" id="conf-pw" placeholder="Repeat new password">
+        </div>
+        <button class="s-btn" onclick="changePassword()">Update Password</button>
+        <div id="pw-change-msg" class="s-msg"></div>
+      </div>
+
+      <!-- Data Export -->
+      <div class="sbox">
+        <div class="sbox-title">📂 Data Utilities</div>
+        <p class="s-hint">Export the current shift data as JSON, or export weekly reports as CSV.</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="s-btn sec" onclick="exportCurrentShiftJSON()">⬇ Export Current Shift</button>
+        </div>
+        <div id="export-msg" class="s-msg"></div>
+      </div>
+
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   CONSTANTS
+   ══════════════════════════════════════════════════════════ */
+const FOLDER_ID = '1-9AAHAYxdLUXg67HZxvrOVFmvNeE7s21';
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive';
+const DEFAULT_PW = 'FFC1234';
+
+const MACHINES = [
+  {id:'EK-1501 A',grp:'EK-1501',sb:false,av:true,job:'Pre cleaner replaced.'},
+  {id:'EK-1501 B',grp:'EK-1501',sb:true, av:true,job:''},
+  {id:'EK-1501 C',grp:'EK-1501',sb:false,av:true,job:'Pre cleaner replaced.'},
+  {id:'EK-1501 D',grp:'EK-1501',sb:false,av:true,job:'Pre cleaner replaced.'},
+  {id:'EK-1521 A',grp:'EK-1521',sb:false,av:true,job:''},
+  {id:'EK-1521 B',grp:'EK-1521',sb:false,av:true,job:''},
+  {id:'EK-1521 C',grp:'EK-1521',sb:false,av:true,job:''},
+  {id:'EK-1531 A',grp:'EK-1531',sb:false,av:true,job:''},
+  {id:'EK-1531 B',grp:'EK-1531',sb:false,av:true,job:''},
+  {id:'EK-1531 C',grp:'EK-1531',sb:false,av:true,job:''},
+  {id:'EK-1531 D',grp:'EK-1531',sb:true, av:true,job:''},
+  {id:'EK-1531 E',grp:'EK-1531',sb:false,av:true,job:''},
+  {id:'EK-1531 F',grp:'EK-1531',sb:false,av:true,job:''},
+];
+
+/* ══════════════════════════════════════════════════════════
+   IN-MEMORY STATE  (no localStorage for shift data)
+   ══════════════════════════════════════════════════════════ */
+let trips = {};            // {machineId: {log:[...]}}
+let driveToken = null;     // OAuth2 access token (in-memory only)
+let gisClient = null;
+let cachedWeekShifts = []; // for weekly analysis — loaded from Drive
+
+function resetTrips() {
+  MACHINES.forEach(m => {
+    trips[m.id] = { log: [] };
+  });
+}
+resetTrips();
+
+/* ══════════════════════════════════════════════════════════
+   CRYPTO / PASSWORD
+   (pw hash stored in localStorage as config, not shift data)
+   ══════════════════════════════════════════════════════════ */
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function checkPassword() {
+  const pw = document.getElementById('pw-input').value;
+  const errEl = document.getElementById('pw-error');
+  if (!pw) { errEl.textContent = 'Please enter a password.'; return; }
+  const stored = localStorage.getItem('gcf_pw');
+  const hash = await sha256(pw);
+  if (hash === stored) {
+    document.getElementById('lock-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    initApp();
+  } else {
+    errEl.textContent = '❌ Incorrect password.';
+    const inp = document.getElementById('pw-input');
+    inp.value = ''; inp.classList.add('shake');
+    setTimeout(() => inp.classList.remove('shake'), 500);
+  }
+}
+
+function lockApp() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('lock-screen').style.display = 'flex';
+  document.getElementById('pw-input').value = '';
+  document.getElementById('pw-error').textContent = '';
+  document.getElementById('pw-input').focus();
+}
+
+async function changePassword() {
+  const cur = document.getElementById('cur-pw').value;
+  const nw  = document.getElementById('new-pw').value;
+  const cf  = document.getElementById('conf-pw').value;
+  const msg = document.getElementById('pw-change-msg');
+  if (!cur||!nw||!cf) { msg.className='s-msg err'; msg.textContent='All fields required.'; return; }
+  if (nw !== cf)       { msg.className='s-msg err'; msg.textContent='Passwords do not match.'; return; }
+  if (nw.length < 4)   { msg.className='s-msg err'; msg.textContent='Min 4 characters.'; return; }
+  if (await sha256(cur) !== localStorage.getItem('gcf_pw')) {
+    msg.className='s-msg err'; msg.textContent='Current password incorrect.'; return;
+  }
+  localStorage.setItem('gcf_pw', await sha256(nw));
+  msg.className='s-msg ok'; msg.textContent='✅ Password updated!';
+  ['cur-pw','new-pw','conf-pw'].forEach(id => document.getElementById(id).value='');
+}
+
+/* ══════════════════════════════════════════════════════════
+   GOOGLE DRIVE AUTH  (Client ID in localStorage as config)
+   ══════════════════════════════════════════════════════════ */
+function getClientId() { return localStorage.getItem('gcf_client_id') || ''; }
+
+function saveClientId() {
+  const val = document.getElementById('client-id-input').value.trim();
+  if (!val) { setDriveMsg('Enter a Client ID first.', false); return; }
+  localStorage.setItem('gcf_client_id', val);
+  setDriveMsg('✅ Client ID saved. Now click Connect.', true);
+}
+
+function connectDrive() {
+  const cid = getClientId();
+  if (!cid) {
+    setDriveMsg('❌ No Client ID saved. Enter and save it first.', false);
+    showToast('Enter your Google Client ID in Settings → Drive section.', 'warn');
+    return;
+  }
+  try {
+    gisClient = google.accounts.oauth2.initTokenClient({
+      client_id: cid,
+      scope: DRIVE_SCOPES,
+      callback: (tokenResponse) => {
+        if (tokenResponse.error) {
+          setDriveStatus(false, 'OAuth error: '+tokenResponse.error);
+          showToast('❌ Google auth failed: '+tokenResponse.error,'err');
+          return;
+        }
+        driveToken = tokenResponse;
+        setDriveStatus(true, 'Connected · Drive ready');
+        showToast('✅ Connected to Google Drive!');
+        loadCurrentShift();
+      }
+    });
+    gisClient.requestAccessToken({ prompt: 'consent' });
+  } catch(e) {
+    setDriveMsg('❌ Failed to initialise GIS: '+e.message, false);
+  }
+}
+
+function disconnectDrive() {
+  if (driveToken) {
+    google.accounts.oauth2.revoke(driveToken.access_token, () => {});
+    driveToken = null;
+  }
+  setDriveStatus(false, 'Disconnected');
+}
+
+function setDriveStatus(ok, text) {
+  const badge = document.getElementById('drive-badge');
+  const icon  = document.getElementById('drive-icon');
+  const stxt  = document.getElementById('drive-status-text');
+  const dot   = document.getElementById('ds-dot');
+  const dtxt  = document.getElementById('ds-text');
+  const dbtn  = document.getElementById('ds-btn');
+  if (ok) {
+    badge.className='drive-badge connected'; icon.textContent='✅'; stxt.textContent='Drive connected';
+    dot.className='ds-dot ok'; dtxt.textContent=text; dbtn.textContent='Reconnect';
+  } else {
+    badge.className='drive-badge disconnected'; icon.textContent='☁️'; stxt.textContent=text||'Not connected';
+    dot.className='ds-dot err'; dtxt.textContent=text||'Not connected'; dbtn.textContent='Connect';
+  }
+}
+
+function setDriveMsg(txt, ok) {
+  const msg = document.getElementById('drive-msg');
+  msg.className = 's-msg '+(ok?'ok':'err');
+  msg.textContent = txt;
+}
+
+/* ══════════════════════════════════════════════════════════
+   DRIVE API HELPERS
+   ══════════════════════════════════════════════════════════ */
+function driveHeaders(extra={}) {
+  return { 'Authorization': `Bearer ${driveToken.access_token}`, ...extra };
+}
+
+async function driveFind(filename) {
+  const q = encodeURIComponent(
+    `name='${filename}' and '${FOLDER_ID}' in parents and trashed=false`
+  );
+  const r = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`,
+    { headers: driveHeaders() }
+  );
+  const d = await r.json();
+  return d.files?.[0] || null;
+}
+
+async function driveReadFile(fileId) {
+  const r = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    { headers: driveHeaders() }
+  );
+  return await r.json();
+}
+
+async function driveSaveJSON(filename, data) {
+  if (!driveToken) { showToast('Not connected to Drive — connect first in Settings.','err'); return false; }
+  const json = JSON.stringify(data, null, 2);
+  const existing = await driveFind(filename);
+  if (existing) {
+    // PATCH content only
+    await fetch(
+      `https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media`,
+      { method:'PATCH', headers: driveHeaders({'Content-Type':'application/json'}), body: json }
+    );
+  } else {
+    // POST multipart (metadata + content)
+    const meta = { name: filename, parents: [FOLDER_ID], mimeType: 'application/json' };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
+    form.append('file',     new Blob([json],                 {type:'application/json'}));
+    await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      { method:'POST', headers: driveHeaders(), body: form }
+    );
+  }
+  return true;
+}
+
+async function driveListShiftFiles() {
+  if (!driveToken) return [];
+  const q = encodeURIComponent(
+    `'${FOLDER_ID}' in parents and name contains 'GCF-' and trashed=false`
+  );
+  const r = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&orderBy=name+desc&pageSize=365`,
+    { headers: driveHeaders() }
+  );
+  const d = await r.json();
+  return d.files || [];
+}
+
+/* ══════════════════════════════════════════════════════════
+   WEEK HELPERS
+   ══════════════════════════════════════════════════════════ */
+function getWeekKey(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = (tmp.getUTCDay() || 7);
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - day);
+  const yr = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+  const wk = Math.ceil(((tmp - yr) / 86400000 + 1) / 7);
+  return `${tmp.getUTCFullYear()}-W${String(wk).padStart(2,'0')}`;
+}
+
+function formatWeekLabel(wk) {
+  const [yr, w] = wk.split('-W');
+  const year = parseInt(yr), week = parseInt(w);
+  const simple = new Date(year, 0, 1 + (week-1)*7);
+  const dow = simple.getDay();
+  const mon = new Date(simple);
+  mon.setDate(simple.getDate() - (dow<=4 ? dow-1 : dow-8));
+  const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+  const f = d => d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  return `Week ${week}, ${year}  (${f(mon)} – ${f(sun)})`;
+}
+
+/* ══════════════════════════════════════════════════════════
+   DURATION UTILITIES
+   ══════════════════════════════════════════════════════════ */
+function fmtDur(totalMin) {
+  if (!totalMin && totalMin !== 0) return '—';
+  const d = Math.floor(totalMin / 1440);
+  const h = Math.floor((totalMin % 1440) / 60);
+  const m = totalMin % 60;
+  let parts = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  parts.push(`${m}m`);
+  return parts.join(' ');
+}
+
+/* ══════════════════════════════════════════════════════════
+   TIME ENTRY MODAL
+   ══════════════════════════════════════════════════════════ */
+let tmMachineId = null;
+let tmMode = 'auto';   // 'auto' | 'manual'
+let tmType = 'none';   // 'none' | 'tripped' | 'manual'
+
+function openTimeModal(id) {
+  tmMachineId = id;
+  tmType = 'none';
+  tmMode = 'auto';
+
+  document.getElementById('tm-machine-name').textContent = id;
+
+  // Default datetimes to today
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0,10);
+  const defaultDt = `${todayStr}T00:00`;
+  document.getElementById('tm-start').value = defaultDt;
+  document.getElementById('tm-end').value   = defaultDt;
+  document.getElementById('tm-man-start').value = defaultDt;
+  document.getElementById('tm-man-h').value = '';
+  document.getElementById('tm-man-m').value = '';
+  document.getElementById('tm-auto-dur').textContent = '—';
+  document.getElementById('tm-auto-min').textContent = '';
+  document.getElementById('tm-man-dur').textContent = '0 hrs 0 min';
+  document.getElementById('tm-man-min').textContent = '';
+
+  // Reset type buttons
+  setTmType('none', document.querySelector('#tm-type-row .type-opt'));
+  switchTmTab('auto', document.querySelector('.tm-tab'));
+
+  renderTmTripsList();
+  document.getElementById('time-modal-overlay').classList.add('open');
+}
+
+function closeTimeModal() {
+  document.getElementById('time-modal-overlay').classList.remove('open');
+  renderMachines();
+  updateStats();
+}
+
+function switchTmTab(tab, btn) {
+  tmMode = tab;
+  document.querySelectorAll('.tm-tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.tm-section').forEach(s => s.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('tm-' + tab).classList.add('on');
+}
+
+function setTmType(type, btn) {
+  tmType = type;
+  document.querySelectorAll('#tm-type-row .type-opt').forEach(b => {
+    b.className = 'type-opt';
+  });
+  if (type==='none')    btn.className = 'type-opt sel-none';
+  if (type==='tripped') btn.className = 'type-opt sel-tripped';
+  if (type==='manual')  btn.className = 'type-opt sel-manual';
+}
+
+function calcAutoDur() {
+  const sv = document.getElementById('tm-start').value;
+  const ev = document.getElementById('tm-end').value;
+  const durEl = document.getElementById('tm-auto-dur');
+  const minEl = document.getElementById('tm-auto-min');
+  if (!sv || !ev) { durEl.textContent='—'; minEl.textContent=''; return; }
+  const diff = (new Date(ev) - new Date(sv)) / 60000; // ms → min
+  if (diff < 0) {
+    durEl.textContent = 'End before Start!';
+    durEl.className = 'tm-dur-val neg';
+    minEl.textContent = '';
+    return;
+  }
+  durEl.className = 'tm-dur-val';
+  durEl.textContent = fmtDur(Math.round(diff));
+  minEl.textContent = `(${Math.round(diff)} minutes total)`;
+}
+
+function calcManualDur() {
+  const h = parseInt(document.getElementById('tm-man-h').value) || 0;
+  const m = parseInt(document.getElementById('tm-man-m').value) || 0;
+  const total = h*60 + m;
+  document.getElementById('tm-man-dur').textContent = `${h} hrs ${m} min`;
+  document.getElementById('tm-man-min').textContent = `(${total} minutes total)`;
+}
+
+function addTrip() {
+  let durMin = 0;
+  let startIso = '', endIso = '';
+
+  if (tmMode === 'auto') {
+    const sv = document.getElementById('tm-start').value;
+    const ev = document.getElementById('tm-end').value;
+    if (!sv || !ev) { showToast('Set start and end date/time first.','warn'); return; }
+    const diff = Math.round((new Date(ev) - new Date(sv)) / 60000);
+    if (diff < 0) { showToast('End time is before start time!','err'); return; }
+    durMin = diff;
+    startIso = sv;
+    endIso   = ev;
+  } else {
+    const h = parseInt(document.getElementById('tm-man-h').value) || 0;
+    const m = parseInt(document.getElementById('tm-man-m').value) || 0;
+    durMin = h*60 + m;
+    if (durMin === 0) { showToast('Enter a duration greater than 0.','warn'); return; }
+    startIso = document.getElementById('tm-man-start').value || '';
+    endIso   = '';
+  }
+
+  const entry = {
+    startIso,
+    endIso,
+    dur: durMin,
+    type: tmType,
+    mode: tmMode,
+    // For display/legacy compatibility
+    startLabel: startIso ? formatDtLabel(startIso) : '—',
+    endLabel:   endIso   ? formatDtLabel(endIso)   : '—',
+  };
+
+  trips[tmMachineId].log.push(entry);
+  renderTmTripsList();
+  updateStats();
+  showToast(`✅ Trip added: ${fmtDur(durMin)} downtime`);
+}
+
+function formatDtLabel(isoStr) {
+  if (!isoStr) return '—';
+  try {
+    return new Date(isoStr).toLocaleString('en-GB', {
+      day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'
+    });
+  } catch { return isoStr; }
+}
+
+function deleteTmTrip(idx) {
+  trips[tmMachineId].log.splice(idx, 1);
+  renderTmTripsList();
+  updateStats();
+}
+
+function renderTmTripsList() {
+  const log = trips[tmMachineId]?.log || [];
+  document.getElementById('tm-trip-count').textContent = log.length;
+  const el = document.getElementById('tm-trips-log');
+  if (!log.length) {
+    el.innerHTML = `<div style="text-align:center;padding:14px;color:#D1D5DB;font-size:11px">No trips logged yet</div>`;
+    return;
+  }
+  el.innerHTML = log.map((t,i) => `
+    <div class="tl-item">
+      <div class="tl-info">
+        <div class="tl-time">${t.startLabel} → ${t.endLabel}</div>
+        <div class="tl-dur">${fmtDur(t.dur)}</div>
+        <div class="tl-type ${t.type==='tripped'?'tripped':'manual'}">
+          ${t.type==='tripped'?'⚡ Tripped':'🔧 Manual Stop'}</div>
+      </div>
+      <button class="tl-del" onclick="deleteTmTrip(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+/* ══════════════════════════════════════════════════════════
+   MACHINE TABLE RENDERING
+   ══════════════════════════════════════════════════════════ */
+function renderMachines() {
+  const body = document.getElementById('mbody');
+  let last = '', html = '';
+  MACHINES.forEach(m => {
+    if (m.grp !== last) {
+      html += `<div class="grpdiv"><span>${m.grp}</span></div>`;
+      last = m.grp;
+    }
+    const log = trips[m.id]?.log || [];
+    const totalDur = log.reduce((a,e) => a+(e.dur||0), 0);
+    const hasLive  = log.some(e => e.startIso && !e.endIso);
+    const rowCls = hasLive ? 'mrow live' : (log.length ? 'mrow has-trips' : 'mrow');
+    const durClass = totalDur > 120 ? 'trip-dur long' : (totalDur > 0 ? 'trip-dur' : 'trip-dur none');
+    const durText  = totalDur > 0 ? fmtDur(totalDur) : 'No trips';
+    html += `
+      <div class="${rowCls}" id="row_${m.id.replace(/ /g,'_')}">
+        <span class="tag">${m.id}</span>
+        <div><div class="cb${m.sb?' on':''}" onclick="toggleSb('${m.id}',this)"></div></div>
+        <div><div class="cb${m.av?' on':''}" onclick="toggleAv('${m.id}',this)"></div></div>
+        <div><input class="jinp" value="${m.job||''}" placeholder="Enter job…"
+          onchange="MACHINES.find(x=>x.id==='${m.id}').job=this.value"></div>
+        <div class="trip-summary">
+          <div class="trip-count">${log.length} trip${log.length!==1?'s':''}</div>
+          <div class="${durClass}">${durText}</div>
+        </div>
+        <button class="time-btn${log.length?' active':''}" onclick="openTimeModal('${m.id}')">⏱</button>
+      </div>`;
+  });
+  body.innerHTML = html;
+}
+
+function toggleSb(id, el) { MACHINES.find(x=>x.id===id).sb = el.classList.toggle('on'); }
+function toggleAv(id, el) { MACHINES.find(x=>x.id===id).av = el.classList.toggle('on'); }
+function toggleCb(el)      { el.classList.toggle('on'); }
+
+/* ══════════════════════════════════════════════════════════
+   STATS
+   ══════════════════════════════════════════════════════════ */
+function getTotalTrips() { return Object.values(trips).reduce((a,t) => a+t.log.length, 0); }
+function getTotalDt()    { return Object.values(trips).reduce((a,t) => a+t.log.reduce((b,e)=>b+(e.dur||0),0), 0); }
+
+function updateStats() {
+  const tr = getTotalTrips(), dt = getTotalDt();
+  ['st-trips','m-trips'].forEach(id => document.getElementById(id).textContent = tr);
+  ['st-dt','m-dt'].forEach(id => document.getElementById(id).textContent = dt);
+  const mtbf = tr>0 ? (8/tr).toFixed(1) : '—';
+  ['st-mtbf','m-mtbf'].forEach(id => document.getElementById(id).textContent = mtbf);
+}
+
+function renderMtbf() {
+  const body = document.getElementById('mtbf-body');
+  const SM = 480; // 8hrs shift in minutes
+  const maxDt = Math.max(1, ...MACHINES.map(m => trips[m.id].log.reduce((a,e)=>a+(e.dur||0),0)));
+  let html = '';
+  MACHINES.forEach(m => {
+    const log = trips[m.id].log;
+    const tr = log.length;
+    const dt = log.reduce((a,e)=>a+(e.dur||0),0);
+    const mtbf = tr>0 ? (8/tr).toFixed(1) : '—';
+    const av   = Math.max(0, (SM-dt)/SM*100).toFixed(0);
+    const bw   = Math.min(100, Math.round(dt/maxDt*100));
+    html += `<div class="mtr">
+      <span class="tag" style="font-size:11px">${m.id}</span>
+      <span class="mv${tr>2?' red':''}">${tr}</span>
+      <div>
+        <span class="mv">${fmtDur(dt)}</span>
+        <div class="bw"><div class="bf" style="width:${bw}%"></div></div>
+      </div>
+      <span class="mv">${mtbf}</span>
+      <span class="mv${parseInt(av)<90?' red':' grn'}">${av}%</span>
+    </div>`;
+  });
+  body.innerHTML = html;
+}
+
+function renderTripList() {
+  const list = document.getElementById('trips-list');
+  let all = [];
+  MACHINES.forEach(m => trips[m.id].log.forEach(e => all.push({machine:m.id,...e})));
+  if (!all.length) {
+    list.innerHTML = `<div class="no-data">No trips logged yet.<br>
+      <span style="font-size:10px;opacity:.7">Tap ⏱ next to a machine to add downtime entries.</span></div>`;
+    return;
+  }
+  all.sort((a,b) => (b.startIso||'').localeCompare(a.startIso||''));
+  list.innerHTML = all.map(t => `
+    <div class="te">
+      <div class="te-tag">${t.machine}</div>
+      <div class="te-badge ${t.type==='tripped'?'tripped':'manual'}">
+        ${t.type==='tripped'?'⚡ Tripped':'🔧 Manual Stop'}</div>
+      <div class="te-row">
+        <span>Start: ${t.startLabel||'—'}</span>
+        <span>End: ${t.endLabel||'—'}</span>
+      </div>
+      <div class="te-dur">${fmtDur(t.dur)}</div>
+    </div>`).join('');
+}
+
+/* ══════════════════════════════════════════════════════════
+   SPARES
+   ══════════════════════════════════════════════════════════ */
+function renderSpares(saved) {
+  let html = '';
+  for (let i=0; i<6; i++) {
+    const n1=saved?.[i*2]?.name||'', q1=saved?.[i*2]?.qty||'';
+    const n2=saved?.[i*2+1]?.name||'', q2=saved?.[i*2+1]?.qty||'';
+    html += `<div class="spare-row">
+      <input placeholder="Spare name…" value="${n1}">
+      <input placeholder="Qty" style="text-align:center" value="${q1}">
+      <input placeholder="Spare name…" value="${n2}">
+      <input placeholder="Qty" style="text-align:center" value="${q2}">
+    </div>`;
+  }
+  document.getElementById('spare-body').innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════════
+   COLLECT SHIFT DATA
+   ══════════════════════════════════════════════════════════ */
+function collectShiftData() {
+  const d = new Date();
+  const dateStr = d.toISOString().split('T')[0];
+  const shift = document.getElementById('shift-sel').value;
+  const spareCells = [...document.querySelectorAll('#spare-body .spare-row input')];
+  const spares = [];
+  for (let i=0; i<spareCells.length; i+=4) {
+    const n1=spareCells[i]?.value, q1=spareCells[i+1]?.value;
+    const n2=spareCells[i+2]?.value, q2=spareCells[i+3]?.value;
+    if (n1||q1) spares.push({name:n1||'',qty:q1||''});
+    if (n2||q2) spares.push({name:n2||'',qty:q2||''});
+  }
+  const auditCbs  = [...document.querySelectorAll('.aitems .cb')];
+  const auditLbls = [...document.querySelectorAll('.aitems .aitem span')];
+  const clCbs     = [...document.querySelectorAll('.clitems .cb')];
+  const clLbls    = [...document.querySelectorAll('.clitems .clitem span')];
+  return {
+    id: `${dateStr}-${shift}`,
+    date: dateStr,
+    shift,
+    week: getWeekKey(dateStr),
+    savedAt: new Date().toISOString(),
+    team: [
+      document.getElementById('tm1').textContent.trim(),
+      document.getElementById('tm2').textContent.trim(),
+      document.getElementById('tm3').textContent.trim(),
+    ],
+    pressures: {
+      p1s: document.getElementById('p1s').value,
+      p1d: document.getElementById('p1d').value,
+      p2s: document.getElementById('p2s').value,
+      p2d: document.getElementById('p2d').value,
+    },
+    machines: MACHINES.map(m => ({
+      id: m.id, grp: m.grp, sb: m.sb, av: m.av, job: m.job||'',
+      trips: trips[m.id].log.map(e=>({...e}))
+    })),
+    notes: document.getElementById('gen-notes').value,
+    audits: auditCbs.map((cb,i) => ({label:auditLbls[i]?.textContent||'',done:cb.classList.contains('on')})),
+    checklist: clCbs.map((cb,i) => ({label:clLbls[i]?.textContent||'',done:cb.classList.contains('on')})),
+    spares,
+    version: 4
+  };
+}
+
+/* ══════════════════════════════════════════════════════════
+   SAVE TO DRIVE
+   ══════════════════════════════════════════════════════════ */
+async function saveShiftData() {
+  if (!driveToken) {
+    showToast('⚠️ Connect to Google Drive first (Settings tab).','warn');
+    return;
+  }
+  const data = collectShiftData();
+  const filename = `GCF-${data.date}-${data.shift}.json`;
+  showToast('⏳ Saving to Google Drive…','info');
+  try {
+    const ok = await driveSaveJSON(filename, data);
+    if (ok) showToast(`✅ Saved to Drive: ${filename}`);
+    else     showToast('❌ Drive save failed — check connection.','err');
+  } catch(e) {
+    showToast('❌ Drive error: '+e.message,'err');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   LOAD CURRENT SHIFT FROM DRIVE
+   ══════════════════════════════════════════════════════════ */
+async function loadCurrentShift() {
+  if (!driveToken) return;
+  const dateStr = new Date().toISOString().split('T')[0];
+  const shift = document.getElementById('shift-sel').value;
+  const filename = `GCF-${dateStr}-${shift}.json`;
+  showToast('⏳ Loading current shift from Drive…','info');
+  try {
+    const file = await driveFind(filename);
+    if (!file) { showToast('No saved data found for this shift.','warn'); return; }
+    const data = await driveReadFile(file.id);
+    applyShiftData(data);
+    showToast('✅ Shift loaded from Drive.');
+  } catch(e) {
+    showToast('❌ Load error: '+e.message,'err');
+  }
+}
+
+function applyShiftData(data) {
+  if (!data) return;
+  document.getElementById('p1s').value = data.pressures?.p1s||'';
+  document.getElementById('p1d').value = data.pressures?.p1d||'';
+  document.getElementById('p2s').value = data.pressures?.p2s||'';
+  document.getElementById('p2d').value = data.pressures?.p2d||'';
+  document.getElementById('gen-notes').value = data.notes||'';
+  if (data.team) {
+    document.getElementById('tm1').textContent = data.team[0]||'Mazher Abbas';
+    document.getElementById('tm2').textContent = data.team[1]||'Muhammad Javed';
+    document.getElementById('tm3').textContent = data.team[2]||'Fahad';
+  }
+  if (data.machines) {
+    data.machines.forEach(md => {
+      const m = MACHINES.find(x=>x.id===md.id);
+      if (m) { m.sb=md.sb; m.av=md.av; m.job=md.job||''; }
+      if (trips[md.id]) {
+        trips[md.id].log = (md.trips||[]).map(t=>({...t}));
+      }
+    });
+  }
+  renderSpares(data.spares);
+  renderMachines();
+  updateStats();
+}
+
+function onShiftChange() {
+  resetTrips();
+  MACHINES.forEach(m => { m.sb=false; m.av=true; m.job=''; });
+  renderMachines();
+  renderSpares();
+  updateStats();
+  loadCurrentShift();
+}
+
+/* ══════════════════════════════════════════════════════════
+   WEEKLY ANALYSIS
+   ══════════════════════════════════════════════════════════ */
+async function loadWeeklyFromDrive() {
+  if (!driveToken) {
+    showToast('Connect to Drive first.','warn');
+    document.getElementById('weekly-content').innerHTML =
+      `<div class="no-data">Connect to Google Drive in Settings to view weekly data.</div>`;
+    return;
+  }
+  showToast('⏳ Loading shift files from Drive…','info');
+  try {
+    const files = await driveListShiftFiles();
+    if (!files.length) {
+      showToast('No GCF files found in Drive folder.','warn');
+      document.getElementById('weekly-content').innerHTML =
+        `<div class="no-data">No shift files found in the Drive folder yet.<br>Save some shifts first.</div>`;
+      return;
+    }
+    // Load all files (batch)
+    cachedWeekShifts = [];
+    for (const f of files) {
+      try {
+        const d = await driveReadFile(f.id);
+        if (d?.date) cachedWeekShifts.push(d);
+      } catch {}
+    }
+    populateWeekSelector();
+    showToast(`✅ Loaded ${cachedWeekShifts.length} shifts from Drive.`);
+  } catch(e) {
+    showToast('❌ Error loading Drive files: '+e.message,'err');
+  }
+}
+
+function populateWeekSelector() {
+  const weeks = [...new Set(cachedWeekShifts.map(s=>s.week))].sort().reverse();
+  const sel = document.getElementById('week-select');
+  if (!weeks.length) {
+    sel.innerHTML = '<option value="">— No data yet —</option>';
+    document.getElementById('weekly-content').innerHTML =
+      `<div class="no-data">No saved shifts loaded yet.<br>
+       <span style="font-size:10px;opacity:.7">Click ↻ Refresh to load from Drive (requires connection).</span></div>`;
+    return;
+  }
+  sel.innerHTML = weeks.map(w=>`<option value="${w}">${formatWeekLabel(w)}</option>`).join('');
+  renderWeeklyAnalysis();
+}
+
+function renderWeeklyAnalysis() {
+  const weekKey = document.getElementById('week-select').value;
+  const container = document.getElementById('weekly-content');
+  if (!weekKey) { container.innerHTML=''; return; }
+  const shifts = cachedWeekShifts.filter(s=>s.week===weekKey);
+  const stats = {};
+  MACHINES.forEach(m => { stats[m.id]={trips:0,downtime:0,tripped:0,manual:0}; });
+  shifts.forEach(sh => {
+    (sh.machines||[]).forEach(md => {
+      if (!stats[md.id]) return;
+      (md.trips||[]).forEach(tr => {
+        stats[md.id].trips++;
+        stats[md.id].downtime += (tr.dur||0);
+        if (tr.type==='tripped') stats[md.id].tripped++;
+        else if (tr.type==='manual') stats[md.id].manual++;
+      });
+    });
+  });
+  const opHours = 8 * shifts.length;
+  Object.keys(stats).forEach(id => {
+    const s = stats[id];
+    s.mtbf = s.trips>0 ? (opHours/s.trips).toFixed(1) : '—';
+    const opMin = opHours*60;
+    s.avail = opMin>0 ? ((opMin-s.downtime)/opMin*100).toFixed(1) : '100.0';
+  });
+  let totalTrips=0, totalDt=0;
+  Object.values(stats).forEach(s=>{totalTrips+=s.trips;totalDt+=s.downtime;});
+  const fleetMtbf = totalTrips>0 ? (opHours*MACHINES.length/totalTrips).toFixed(1) : '—';
+  const maxDt = Math.max(1, ...Object.values(stats).map(s=>s.downtime));
+  let html = `
+    <div class="sgrid">
+      <div class="scard"><div class="sl">Shifts</div><div class="sv">${shifts.length}</div></div>
+      <div class="scard"><div class="sl">Total Trips</div><div class="sv">${totalTrips}</div></div>
+      <div class="scard"><div class="sl">Fleet Downtime</div><div class="sv">${fmtDur(totalDt)}</div></div>
+    </div>
+    <div class="sgrid">
+      <div class="scard"><div class="sl">Fleet MTBF</div><div class="sv">${fleetMtbf}</div><div class="su">hrs</div></div>
+      <div class="scard"><div class="sl">Op Hrs/Mach</div><div class="sv">${opHours}</div><div class="su">hrs</div></div>
+      <div class="scard"><div class="sl">Machines</div><div class="sv">${MACHINES.length}</div></div>
+    </div>
+    <div class="stitle">Per-Machine Breakdown</div>
+    <div class="weekly-table">
+      <div class="wth"><span>Machine</span><span>Trips</span><span>Downtime</span><span>MTBF</span><span>Avail%</span></div>
+      <div>`;
+  MACHINES.forEach(m => {
+    const s = stats[m.id]||{trips:0,downtime:0,mtbf:'—',avail:'100.0'};
+    const bw = Math.min(100, Math.round(s.downtime/maxDt*100));
+    const av = parseFloat(s.avail);
+    html += `<div class="wtr">
+      <span class="tag" style="font-size:11px">${m.id}</span>
+      <span class="mv${s.trips>3?' red':''}">${s.trips}</span>
+      <div><span class="mv">${fmtDur(s.downtime)}</span>
+        <div class="bw"><div class="bf" style="width:${bw}%"></div></div></div>
+      <span class="mv">${s.mtbf}</span>
+      <span class="mv${av<90?' red':' grn'}">${s.avail}%</span>
+    </div>`;
+  });
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+function exportWeeklyCSV() {
+  const weekKey = document.getElementById('week-select').value;
+  if (!weekKey) { showToast('No week selected','err'); return; }
+  const shifts = cachedWeekShifts.filter(s=>s.week===weekKey);
+  if (!shifts.length) { showToast('No data for selected week','warn'); return; }
+  const stats = {};
+  MACHINES.forEach(m => { stats[m.id]={trips:0,downtime:0,tripped:0,manual:0}; });
+  shifts.forEach(sh => {
+    (sh.machines||[]).forEach(md => {
+      (md.trips||[]).forEach(tr => {
+        if (!stats[md.id]) return;
+        stats[md.id].trips++;
+        stats[md.id].downtime+=(tr.dur||0);
+        if (tr.type==='tripped') stats[md.id].tripped++;
+        else stats[md.id].manual++;
+      });
+    });
+  });
+  const opHours = 8*shifts.length;
+  let csv = 'Machine,Trips,Downtime(min),MTBF(hrs),Availability%,Tripped,Manual\n';
+  MACHINES.forEach(m => {
+    const s = stats[m.id]||{trips:0,downtime:0,tripped:0,manual:0};
+    const mtbf = s.trips>0?(opHours/s.trips).toFixed(1):'';
+    const opMin = opHours*60;
+    const av = opMin>0?((opMin-s.downtime)/opMin*100).toFixed(1):'100.0';
+    csv += `"${m.id}",${s.trips},${s.downtime},${mtbf},${av},${s.tripped},${s.manual}\n`;
+  });
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `gcf-weekly-${weekKey}.csv`;
+  a.click();
+}
+
+function exportCurrentShiftJSON() {
+  const data = collectShiftData();
+  const a = document.createElement('a');
+  a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data,null,2));
+  a.download = `GCF-${data.date}-${data.shift}.json`;
+  a.click();
+  const msg = document.getElementById('export-msg');
+  msg.className='s-msg ok'; msg.textContent='✅ JSON downloaded.';
+}
+
+/* ══════════════════════════════════════════════════════════
+   TAB SWITCHING
+   ══════════════════════════════════════════════════════════ */
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tc').forEach(el=>el.classList.remove('on'));
+  document.querySelectorAll('.tb').forEach(el=>el.classList.remove('on'));
+  document.getElementById('tab-'+tab).classList.add('on');
+  if (btn) { btn.classList.add('on'); } else {
+    document.querySelector(`[data-tab="${tab}"]`)?.classList.add('on');
+  }
+  if (tab==='mtbf')  renderMtbf();
+  if (tab==='trips') renderTripList();
+  if (tab==='settings') initSettings();
+  if (tab==='weekly') {
+    populateWeekSelector();
+    if (cachedWeekShifts.length===0 && driveToken) loadWeeklyFromDrive();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   SETTINGS
+   ══════════════════════════════════════════════════════════ */
+function initSettings() {
+  const cid = getClientId();
+  if (cid) document.getElementById('client-id-input').value = cid;
+  if (driveToken) {
+    setDriveStatus(true, 'Connected to Google Drive');
+  } else {
+    setDriveStatus(false, cid ? 'Client ID saved — click Connect' : 'Enter Client ID to connect');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   TOAST
+   ══════════════════════════════════════════════════════════ */
+function showToast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type==='err'?' err':type==='warn'?' warn':type==='info'?' info':'');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className='', 3800);
+}
+
+/* ══════════════════════════════════════════════════════════
+   INIT
+   ══════════════════════════════════════════════════════════ */
+async function initApp() {
+  document.getElementById('live-date').textContent =
+    new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  // Reset machine defaults
+  MACHINES.forEach(m => {
+    m.sb = false; m.av = true;
+    m.job = ['EK-1501 A','EK-1501 C','EK-1501 D'].includes(m.id) ? 'Pre cleaner replaced.' : '';
+  });
+  resetTrips();
+  renderMachines();
+  renderSpares();
+  updateStats();
+  // Auto-connect if client ID already saved
+  const cid = getClientId();
+  if (cid) {
+    try {
+      gisClient = google.accounts.oauth2.initTokenClient({
+        client_id: cid,
+        scope: DRIVE_SCOPES,
+        callback: (tokenResponse) => {
+          if (!tokenResponse.error) {
+            driveToken = tokenResponse;
+            setDriveStatus(true, 'Connected · Drive ready');
+            loadCurrentShift();
+          }
+        }
+      });
+      // Silent token request (no popup if already authorised)
+      gisClient.requestAccessToken({ prompt: '' });
+    } catch(e) {
+      // GIS not yet loaded — will need manual connect
+    }
+  }
+}
+
+async function boot() {
+  if (!localStorage.getItem('gcf_pw')) {
+    localStorage.setItem('gcf_pw', await sha256(DEFAULT_PW));
+  }
+  document.getElementById('pw-input').focus();
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
